@@ -1,16 +1,22 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_migrate import Migrate
+
 from models import db, Product, CustomerOrder, CustomerOrderItem
+
 
 app = Flask(__name__)
 CORS(app)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://drones_user:drones_password@postgres_db:5432/drones_db"
+app.config["SQLALCHEMY_DATABASE_URI"] = (
+    "postgresql://drones_user:drones_password@postgres_db:5432/drones_db"
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 
 db.init_app(app)
 migrate = Migrate(app, db)
+
 
 @app.route("/products", methods=["GET"])
 def get_products():
@@ -26,6 +32,7 @@ def get_products():
         } for p in products
     ])
 
+
 @app.route("/products/<int:product_id>", methods=["GET"])
 def get_product(product_id):
     product = Product.query.get_or_404(product_id)
@@ -39,12 +46,14 @@ def get_product(product_id):
         "image": product.image
     })
 
+
 @app.route("/about", methods=["GET"])
 def about_page():
     return jsonify({
         "title": "About This Project",
         "description": "Flask + React + PostgreSQL + Docker"
     })
+
 
 @app.route("/contacts", methods=["GET"])
 def contacts_page():
@@ -54,9 +63,9 @@ def contacts_page():
         "location": "Sofia, Bulgaria"
     })
 
+
 @app.route("/orders", methods=["POST"])
 def create_order():
-    print("Hello 1")
     data = request.get_json()
 
     if not data:
@@ -82,6 +91,7 @@ def create_order():
 
     db.session.commit()
     return jsonify({"order_id": order.id}), 201
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
