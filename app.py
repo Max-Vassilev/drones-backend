@@ -3,6 +3,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 import redis
 import json
+import time
 
 from models import db, Product, CustomerOrder, CustomerOrderItem
 
@@ -24,10 +25,13 @@ redis_client = redis.Redis(
 
 @app.route("/products", methods=["GET"])
 def get_products():
+    start_time = time.time()
+
     cached_products = redis_client.get("all_products")
 
     if cached_products:
-        print("[REDIS] Cache HIT", flush=True)
+        elapsed = time.time() - start_time
+        print(f"[REDIS] Cache HIT | {elapsed:.4f}s", flush=True)
         return jsonify(json.loads(cached_products))
 
     print("[REDIS] Cache MISS", flush=True)
@@ -45,7 +49,9 @@ def get_products():
     ]
 
     redis_client.setex("all_products", 300, json.dumps(products_list))
-    print("[REDIS] Cache SET", flush=True)
+
+    elapsed = time.time() - start_time
+    print(f"[REDIS] Cache SET | {elapsed:.4f}s", flush=True)
 
     return jsonify(products_list)
 
