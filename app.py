@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Use this one when the backend is running with a container:
-app.config["SQLALCHEMY_DATABASE_URI"] = ("postgresql://drones_user:drones_password@postgres_db:5432/drones_db")
+app.config["SQLALCHEMY_DATABASE_URI"] = ("postgresql://drones_user:drones_password@postgres_db-container:5432/drones_db")
 
 # Use this one when the backend is running locally:
 # app.config["SQLALCHEMY_DATABASE_URI"] = ("postgresql://drones_user:drones_password@localhost:5432/drones_db")
