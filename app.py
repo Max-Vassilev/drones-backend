@@ -14,11 +14,14 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 migrate = Migrate(app, db)
 
+# Create Redis client connection to Redis service
 redis_client = redis.Redis(host="redis-container", port=6379, db=0, decode_responses=True)
 
 @app.route("/products", methods=["GET"])
 def get_products():
     start_time = time.time()
+
+    # Try to get cached products list from Redis
     cached_products = redis_client.get("all_products")
 
     if cached_products:
@@ -36,6 +39,7 @@ def get_products():
         "image": p.image
     } for p in Product.query.all()]
 
+    # Store products list in Redis with 5-minute expiration
     redis_client.setex("all_products", 300, json.dumps(products_list))
     print(f"[REDIS] Cache SET | {time.time() - start_time:.4f}s", flush=True)
 
@@ -72,6 +76,8 @@ def create_order():
         db.session.add(CustomerOrderItem(order_id=order.id, product_id=i["product_id"], quantity=i["quantity"]))
 
     db.session.commit()
+
+    # Remove cached products so next request gets fresh data
     redis_client.delete("all_products")
     print("[REDIS] Cache INVALIDATED", flush=True)
 
