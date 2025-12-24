@@ -1,9 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_migrate import Migrate
-import redis
-import json
-import time
+import redis, json, time
 
 from models import db, Product, CustomerOrder, CustomerOrderItem
 
@@ -16,104 +14,76 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 migrate = Migrate(app, db)
 
-redis_client = redis.Redis(
-    host="redis-container",
-    port=6379,
-    db=0,
-    decode_responses=True
-)
+redis_client = redis.Redis(host="redis-container", port=6379, db=0, decode_responses=True)
 
 @app.route("/products", methods=["GET"])
 def get_products():
     start_time = time.time()
-
     cached_products = redis_client.get("all_products")
 
     if cached_products:
-        elapsed = time.time() - start_time
-        print(f"[REDIS] Cache HIT | {elapsed:.4f}s", flush=True)
+        print(f"[REDIS] Cache HIT | {time.time() - start_time:.4f}s", flush=True)
         return jsonify(json.loads(cached_products))
 
     print("[REDIS] Cache MISS", flush=True)
 
-    products = Product.query.all()
-    products_list = [
-        {
-            "id": p.id,
-            "name": p.name,
-            "type": p.type,
-            "price": p.price,
-            "description": p.description,
-            "image": p.image
-        } for p in products
-    ]
+    products_list = [{
+        "id": p.id,
+        "name": p.name,
+        "type": p.type,
+        "price": p.price,
+        "description": p.description,
+        "image": p.image
+    } for p in Product.query.all()]
 
     redis_client.setex("all_products", 300, json.dumps(products_list))
-
-    elapsed = time.time() - start_time
-    print(f"[REDIS] Cache SET | {elapsed:.4f}s", flush=True)
+    print(f"[REDIS] Cache SET | {time.time() - start_time:.4f}s", flush=True)
 
     return jsonify(products_list)
 
 @app.route("/products/<int:product_id>", methods=["GET"])
 def get_product(product_id):
-    product = Product.query.get_or_404(product_id)
+    p = Product.query.get_or_404(product_id)
     return jsonify({
-        "id": product.id,
-        "name": product.name,
-        "type": product.type,
-        "price": product.price,
-        "description": product.description,
-        "full_description": product.full_description,
-        "image": product.image
-    })
-
-@app.route("/about", methods=["GET"])
-def about_page():
-    return jsonify({
-        "title": "About This Project",
-        "description": "Flask + React + PostgreSQL + Docker"
-    })
-
-@app.route("/contacts", methods=["GET"])
-def contacts_page():
-    return jsonify({
-        "name": "Maxim Vassilev",
-        "title": "Full Stack Web Developer & DevOps Engineer",
-        "location": "Sofia, Bulgaria"
+        "id": p.id,
+        "name": p.name,
+        "type": p.type,
+        "price": p.price,
+        "description": p.description,
+        "full_description": p.full_description,
+        "image": p.image
     })
 
 @app.route("/orders", methods=["POST"])
 def create_order():
     data = request.get_json()
-
     if not data:
         return jsonify({"error": "Invalid JSON"}), 400
 
     order = CustomerOrder(
-        first_name=data["first_name"],
-        last_name=data["last_name"],
-        phone=data["phone"],
-        courier=data["courier"],
-        address=data["address"]
+        first_name=data["first_name"], last_name=data["last_name"],
+        phone=data["phone"], courier=data["courier"], address=data["address"]
     )
 
     db.session.add(order)
     db.session.flush()
 
-    for item in data["items"]:
-        db.session.add(CustomerOrderItem(
-            order_id=order.id,
-            product_id=item["product_id"],
-            quantity=item["quantity"]
-        ))
+    for i in data["items"]:
+        db.session.add(CustomerOrderItem(order_id=order.id, product_id=i["product_id"], quantity=i["quantity"]))
 
     db.session.commit()
-
     redis_client.delete("all_products")
     print("[REDIS] Cache INVALIDATED", flush=True)
 
     return jsonify({"order_id": order.id}), 201
+
+@app.route("/about", methods=["GET"])
+def about_page():
+    return jsonify({"title": "About This Project", "description": "Flask + React + PostgreSQL + Docker"})
+
+@app.route("/contacts", methods=["GET"])
+def contacts_page():
+    return jsonify({"name": "Maxim Vassilev", "title": "Full Stack Web Developer & DevOps Engineer", "location": "Sofia, Bulgaria"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
