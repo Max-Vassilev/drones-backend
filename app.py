@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_migrate import Migrate
+import redis  # NEW: Redis client library
+import json   # NEW: Used to serialize/deserialize cached data
 
 from models import db, Product, CustomerOrder, CustomerOrderItem
 
@@ -20,11 +22,24 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 migrate = Migrate(app, db)
 
+# NEW: Initialize Redis client (host = container name, same Docker network)
+redis_client = redis.Redis(host="redis-container", port=6379, db=0, decode_responses=True)
+
 
 @app.route("/products", methods=["GET"])
 def get_products():
+    # NEW: Try to fetch products from Redis cache first
+    cached_products = redis_client.get("all_products")
+
+    if cached_products:
+        print("[REDIS] Cache HIT → returning products from Redis")
+        return jsonify(json.loads(cached_products))
+
+    print("[REDIS] Cache MISS → querying database")
+
+    # Existing logic: fetch from database
     products = Product.query.all()
-    return jsonify([
+    products_list = [
         {
             "id": p.id,
             "name": p.name,
@@ -33,7 +48,13 @@ def get_products():
             "description": p.description,
             "image": p.image
         } for p in products
-    ])
+    ]
+
+    # NEW: Store products in Redis with TTL (5 minutes)
+    redis_client.setex("all_products", 300, json.dumps(products_list))
+    print("[REDIS] Cache SET → products stored in Redis")
+
+    return jsonify(products_list)
 
 
 @app.route("/products/<int:product_id>", methods=["GET"])
@@ -93,6 +114,11 @@ def create_order():
         ))
 
     db.session.commit()
+
+    # NEW: Invalidate products cache when data changes
+    redis_client.delete("all_products")
+    print("[REDIS] Cache INVALIDATED → all_products deleted")
+
     return jsonify({"order_id": order.id}), 201
 
 
