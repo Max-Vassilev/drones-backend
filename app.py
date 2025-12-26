@@ -92,4 +92,4 @@ def contacts_page():
     return jsonify({"name": "Maxim Vassilev", "title": "Full Stack Web Developer & DevOps Engineer", "location": "Sofia, Bulgaria"})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
