@@ -15,7 +15,7 @@ db.init_app(app)
 migrate = Migrate(app, db)
 
 # Create Redis client connection to Redis service
-redis_client = redis.Redis(host="redis-container", port=6379, db=0, decode_responses=True)
+redis_client = redis.Redis(host="drones-redis", port=6379, db=0, decode_responses=True)
 
 @app.route("/products", methods=["GET"])
 def get_products():
