@@ -8,7 +8,7 @@ from models import db, Product, CustomerOrder, CustomerOrderItem
 app = Flask(__name__)
 CORS(app)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://drones_user:drones_password@drones-postgres-db:5432/drones_db"
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://drones_user:drones_password@drones-postgres:5432/drones_db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
