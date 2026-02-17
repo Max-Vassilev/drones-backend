@@ -9,5 +9,4 @@ Here are the backend logs showing cache miss and cache hits with Redis:
 172.18.0.1 - - [24/Dec/2025 13:43:03] "GET /products HTTP/1.1" 200 -
 [REDIS] Cache HIT | 0.0008s
 172.18.0.1 - - [24/Dec/2025 13:43:03] "GET /products HTTP/1.1" 200 -
-[REDIS] Cache HIT | 0.0010s
 ```
