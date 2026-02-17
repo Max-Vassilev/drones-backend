@@ -1,95 +1,93 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from flask_migrate import Migrate
-import redis, json, time
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from typing import List
 
-from models import db, Product, CustomerOrder, CustomerOrderItem
+DATABASE_URL = "postgresql://drones_user:drones_password@drones-postgres:5432/drones_db"
 
-app = Flask(__name__)
-CORS(app)
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://drones_user:drones_password@drones-postgres:5432/drones_db"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app = FastAPI()
 
-db.init_app(app)
-migrate = Migrate(app, db)
 
-# Create Redis client connection to Redis service
-redis_client = redis.Redis(host="drones-redis", port=6379, db=0, decode_responses=True)
+class OrderItem(BaseModel):
+    product_id: int
+    quantity: int
 
-@app.route("/products", methods=["GET"])
+
+class OrderCreate(BaseModel):
+    first_name: str
+    last_name: str
+    phone: str
+    courier: str
+    address: str
+    items: List[OrderItem]
+
+
+@app.get("/products")
 def get_products():
-    start_time = time.time()
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT id, name, type, price, description, image
+            FROM products
+        """))
+        return [dict(row._mapping) for row in result]
 
-    # Try to get cached products list from Redis
-    cached_products = redis_client.get("all_products")
 
-    if cached_products:
-        print(f"[REDIS] Cache HIT | {time.time() - start_time:.4f}s", flush=True)
-        return jsonify(json.loads(cached_products))
+@app.get("/products/{product_id}")
+def get_product(product_id: int):
+    with engine.connect() as conn:
+        result = conn.execute(
+            text("SELECT * FROM products WHERE id = :id"),
+            {"id": product_id}
+        ).fetchone()
 
-    print("[REDIS] Cache MISS", flush=True)
+        if not result:
+            raise HTTPException(status_code=404, detail="Product not found")
 
-    products_list = [{
-        "id": p.id,
-        "name": p.name,
-        "type": p.type,
-        "price": p.price,
-        "description": p.description,
-        "image": p.image
-    } for p in Product.query.all()]
+        return dict(result._mapping)
 
-    # Store products list in Redis with 5-minute expiration
-    redis_client.setex("all_products", 300, json.dumps(products_list))
-    print(f"[REDIS] Cache SET | {time.time() - start_time:.4f}s", flush=True)
 
-    return jsonify(products_list)
+@app.post("/orders")
+def create_order(order: OrderCreate):
+    with engine.begin() as conn:
+        order_result = conn.execute(text("""
+            INSERT INTO customer_orders
+            (first_name, last_name, phone, courier, address)
+            VALUES (:first_name, :last_name, :phone, :courier, :address)
+            RETURNING id
+        """), order.dict())
 
-@app.route("/products/<int:product_id>", methods=["GET"])
-def get_product(product_id):
-    p = Product.query.get_or_404(product_id)
-    return jsonify({
-        "id": p.id,
-        "name": p.name,
-        "type": p.type,
-        "price": p.price,
-        "description": p.description,
-        "full_description": p.full_description,
-        "image": p.image
-    })
+        order_id = order_result.fetchone()[0]
 
-@app.route("/orders", methods=["POST"])
-def create_order():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
+        for item in order.items:
+            conn.execute(text("""
+                INSERT INTO customer_order_items
+                (order_id, product_id, quantity)
+                VALUES (:order_id, :product_id, :quantity)
+            """), {
+                "order_id": order_id,
+                "product_id": item.product_id,
+                "quantity": item.quantity
+            })
 
-    order = CustomerOrder(
-        first_name=data["first_name"], last_name=data["last_name"],
-        phone=data["phone"], courier=data["courier"], address=data["address"]
-    )
+    return {"order_id": order_id}
 
-    db.session.add(order)
-    db.session.flush()
 
-    for i in data["items"]:
-        db.session.add(CustomerOrderItem(order_id=order.id, product_id=i["product_id"], quantity=i["quantity"]))
-
-    db.session.commit()
-
-    # Remove cached products so next request gets fresh data
-    redis_client.delete("all_products")
-    print("[REDIS] Cache INVALIDATED", flush=True)
-
-    return jsonify({"order_id": order.id}), 201
-
-@app.route("/about", methods=["GET"])
+@app.get("/about")
 def about_page():
-    return jsonify({"title": "About This Project", "description": "Flask + React + PostgreSQL + Docker"})
+    return {
+        "title": "About This Project",
+        "description": "FastAPI + React + PostgreSQL + Docker"
+    }
 
-@app.route("/contacts", methods=["GET"])
+
+@app.get("/contacts")
 def contacts_page():
-    return jsonify({"name": "Maxim Vassilev", "title": "Full Stack Web Developer & DevOps Engineer", "location": "Sofia, Bulgaria"})
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=False, use_reloader=False)
+    return {
+        "name": "Maxim Vassilev",
+        "title": "Full Stack Web Developer & DevOps Engineer",
+        "location": "Sofia, Bulgaria"
+    }
