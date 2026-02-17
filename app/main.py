@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from typing import List
 
-DATABASE_URL = "postgresql://drones_user:drones_password@drones-postgres:5432/drones_db"
+DATABASE_URL = "postgresql://postgres_user:postgres_password@drones-db:5432/drones_database"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
