@@ -15,5 +15,5 @@ On every push to the main branch, the build-and-publish.yaml GitHub Actions work
 The workflow automatically builds the backend Docker image and publishes it to GitHub Container Registry (GHCR) with an incremented version tag.
 
 For simplicity, versions are represented as plain sequential numbers.
-In the example below, you can see an automatically generated image with version 7.
-<img width="1000" height="700" alt="image" src="https://github.com/user-attachments/assets/334d5130-fc5b-45a7-b4f9-577710eea2be" />
+In the example below, you can see an automatically generated image with version 1.
+<img width="1000" height="500" alt="image" src="https://github.com/user-attachments/assets/2363c6f0-30f5-429f-ba18-34fec588e3e1" />
