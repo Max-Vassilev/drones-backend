@@ -3,11 +3,15 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from typing import List
+import redis
+import json
 
-DATABASE_URL = "postgresql://postgres_user:postgres_password@drones-db:5432/drones_database"
+DATABASE_URL = "postgresql://postgres_user:postgres_password@database_container:5432/drones_database"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+redis_client = redis.Redis(host="redis_container", port=6379, db=0, decode_responses=True)
 
 app = FastAPI()
 
@@ -28,12 +32,19 @@ class OrderCreate(BaseModel):
 
 @app.get("/products")
 def get_products():
+    cached = redis_client.get("all_products")
+    if cached:
+        return json.loads(cached)
+
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT id, name, type, price, description, image
             FROM products
         """))
-        return [dict(row._mapping) for row in result]
+        products = [dict(row._mapping) for row in result]
+
+    redis_client.setex("all_products", 600, json.dumps(products))
+    return products
 
 
 @app.get("/products/{product_id}")
@@ -73,6 +84,7 @@ def create_order(order: OrderCreate):
                 "quantity": item.quantity
             })
 
+    redis_client.delete("all_products")
     return {"order_id": order_id}
 
 
