@@ -10,3 +10,10 @@ Here are the backend logs showing cache miss and cache hits with Redis:
 [REDIS] Cache HIT | 0.0008s
 172.18.0.1 - - [24/Dec/2025 13:43:03] "GET /products HTTP/1.1" 200 -
 ```
+## Backend Image Publishing ##
+On every push to the main branch, the build-and-publish.yaml GitHub Actions workflow is triggered.
+The workflow automatically builds the backend Docker image and publishes it to GitHub Container Registry (GHCR) with an incremented version tag.
+
+For simplicity, versions are represented as plain sequential numbers.
+In the example below, you can see an automatically generated image with version 7.
+<img width="1000" height="700" alt="image" src="https://github.com/user-attachments/assets/334d5130-fc5b-45a7-b4f9-577710eea2be" />
